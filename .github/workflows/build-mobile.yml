@@ -112,7 +112,9 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            COMPILER_INDEX_STORE_ENABLE=NO
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            SWIFT_VERSION=5 \
+            OTHER_SWIFT_FLAGS="-strict-concurrency=minimal"
 
       - name: Package IPA
         run: |
