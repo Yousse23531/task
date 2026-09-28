@@ -70,11 +70,13 @@ jobs:
           node-version: 22
           cache: 'npm'
 
-      - name: Select Xcode Version
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+      - name: Show Xcode Version
+        run: |
+          xcode-select -p
+          xcodebuild -version
 
       - name: Install Dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build Web App
         run: npm run build
@@ -128,6 +130,7 @@ jobs:
       - name: Resolve Swift Packages
         run: |
           cd ios/App
+          set -o pipefail
           xcodebuild ${{ steps.detect.outputs.BUILD_ARG }} \
             -scheme App \
             -resolvePackageDependencies \
