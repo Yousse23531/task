@@ -26,7 +26,7 @@ jobs:
           java-version: '17'
 
       - name: Install Dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build Web App
         run: npm run build
@@ -74,7 +74,7 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_16.2.app
 
       - name: Install Dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build Web App
         run: npm run build
@@ -82,22 +82,26 @@ jobs:
       - name: Sync Capacitor (generates App.xcworkspace)
         run: npx cap sync ios
 
-      - name: Patch plugin Package.swift to Swift 5.9
+      - name: Patch keyboard/status-bar Package.swift to Swift 5.9
         run: |
+          # SplashScreen uses local committed patched package - only patch keyboard & status-bar
           for pkg in \
-            node_modules/@capacitor/keyboard/ios \
-            node_modules/@capacitor/splash-screen/ios \
-            node_modules/@capacitor/status-bar/ios; do
-            if [ -f "$pkg/Package.swift" ]; then
-              echo "=== Before patch: $pkg/Package.swift ==="
-              head -3 "$pkg/Package.swift"
-              sed -i '' 's/swift-tools-version:[[:space:]]*[0-9][0-9.]*/swift-tools-version: 5.9/' "$pkg/Package.swift"
-              # Remove swiftLanguageVersions line(s) that pin to Swift 6
-              sed -i '' '/swiftLanguageVersions/d' "$pkg/Package.swift"
+            node_modules/@capacitor/keyboard \
+            node_modules/@capacitor/status-bar; do
+            PKG_SWIFT="$pkg/Package.swift"
+            if [ -f "$PKG_SWIFT" ]; then
+              echo "=== Patching: $PKG_SWIFT ==="
+              head -3 "$PKG_SWIFT"
+              sed -i '' 's/swift-tools-version:[[:space:]]*[0-9][0-9.]*/swift-tools-version: 5.9/' "$PKG_SWIFT"
+              sed -i '' '/swiftLanguageVersions/d' "$PKG_SWIFT"
               echo "=== After patch ==="
-              head -3 "$pkg/Package.swift"
+              head -3 "$PKG_SWIFT"
+            else
+              echo "Not found: $PKG_SWIFT"
             fi
           done
+          echo "=== Using local patched SplashScreen at ios/App/CapacitorSplashScreenLocal ==="
+          head -3 ios/App/CapacitorSplashScreenLocal/Package.swift
 
       - name: Detect workspace or project
         id: detect
