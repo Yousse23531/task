@@ -70,22 +70,40 @@ jobs:
       - name: Build Web App
         run: npm run build
 
-      - name: Sync Capacitor
+      - name: Sync Capacitor (generates App.xcworkspace)
         run: npx cap sync ios
+
+      - name: Show ios/App contents (debug)
+        run: ls -la ios/App/
 
       - name: Resolve Swift Package Dependencies
         run: |
           cd ios/App
-          xcodebuild -resolvePackageDependencies \
-            -workspace App.xcworkspace \
-            -scheme App \
-            -clonedSourcePackagesDirPath SourcePackages
+          # Use whichever workspace exists after cap sync
+          if [ -f "App.xcworkspace/contents.xcworkspacedata" ]; then
+            echo "Found App.xcworkspace"
+            xcodebuild -resolvePackageDependencies \
+              -workspace App.xcworkspace \
+              -scheme App \
+              -clonedSourcePackagesDirPath SourcePackages
+          else
+            echo "App.xcworkspace not found, using xcodeproj"
+            xcodebuild -resolvePackageDependencies \
+              -project App.xcodeproj \
+              -scheme App \
+              -clonedSourcePackagesDirPath SourcePackages
+          fi
 
       - name: Build iOS App (Archive)
         run: |
           cd ios/App
+          if [ -f "App.xcworkspace/contents.xcworkspacedata" ]; then
+            WORKSPACE_ARG="-workspace App.xcworkspace"
+          else
+            WORKSPACE_ARG="-project App.xcodeproj"
+          fi
           xcodebuild \
-            -workspace App.xcworkspace \
+            $WORKSPACE_ARG \
             -scheme App \
             -destination generic/platform=iOS \
             -configuration Release \
@@ -94,8 +112,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            COMPILER_INDEX_STORE_ENABLE=NO \
-            | xcpretty || true
+            COMPILER_INDEX_STORE_ENABLE=NO
 
       - name: Package IPA
         run: |
