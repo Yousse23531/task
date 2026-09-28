@@ -34,6 +34,12 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Install Android SDK 36
+        run: |
+          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0"
+
       - name: Make Gradlew Executable
         run: chmod +x android/gradlew
 
@@ -72,6 +78,23 @@ jobs:
 
       - name: Sync Capacitor (generates App.xcworkspace)
         run: npx cap sync ios
+
+      - name: Patch Capacitor plugin Package.swift for Swift 5 compatibility
+        run: |
+          # Downgrade swift-tools-version in all Capacitor plugin Package.swift files
+          for pkg in \
+            node_modules/@capacitor/keyboard/ios \
+            node_modules/@capacitor/splash-screen/ios \
+            node_modules/@capacitor/status-bar/ios; do
+            if [ -f "$pkg/Package.swift" ]; then
+              echo "Patching $pkg/Package.swift"
+              # Replace swift-tools-version 6.x or 5.10+ with 5.9
+              sed -i '' 's/swift-tools-version: [0-9][0-9]*/swift-tools-version: 5.9/' "$pkg/Package.swift"
+              # Remove any swiftLanguageVersions that forces Swift 6
+              sed -i '' '/swiftLanguageVersions/d' "$pkg/Package.swift"
+              cat "$pkg/Package.swift" | head -5
+            fi
+          done
 
       - name: Show ios/App contents (debug)
         run: ls -la ios/App/
