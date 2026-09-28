@@ -82,9 +82,19 @@ jobs:
       - name: Sync Capacitor (generates App.xcworkspace)
         run: npx cap sync ios
 
+      - name: Override SplashScreen with local stub package (cap sync resets this)
+        run: |
+          echo "=== CapApp-SPM/Package.swift BEFORE override ==="
+          cat ios/App/CapApp-SPM/Package.swift
+          # cap sync regenerates this file - restore our local patched version
+          sed -i '' 's|path: "../../../node_modules/@capacitor/splash-screen"|path: "../CapacitorSplashScreenLocal"|g' \
+            ios/App/CapApp-SPM/Package.swift
+          echo "=== CapApp-SPM/Package.swift AFTER override ==="
+          cat ios/App/CapApp-SPM/Package.swift
+
       - name: Patch keyboard/status-bar Package.swift to Swift 5.9
         run: |
-          # SplashScreen uses local committed patched package - only patch keyboard & status-bar
+          # SplashScreen uses local committed stub package - only patch keyboard & status-bar
           for pkg in \
             node_modules/@capacitor/keyboard \
             node_modules/@capacitor/status-bar; do
@@ -100,7 +110,7 @@ jobs:
               echo "Not found: $PKG_SWIFT"
             fi
           done
-          echo "=== Using local patched SplashScreen at ios/App/CapacitorSplashScreenLocal ==="
+          echo "=== Local SplashScreen stub ==="
           head -3 ios/App/CapacitorSplashScreenLocal/Package.swift
 
       - name: Detect workspace or project
