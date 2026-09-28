@@ -1,0 +1,86 @@
+{
+  "name": "ahmed-task-manager",
+  "private": true,
+  "version": "1.1.0",
+  "description": "Desktop Task & Event Manager",
+  "author": "Ahmed",
+  "main": "electron/main.cjs",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "electron:dev": "concurrently -k \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "vite build && node scripts/generate-icon.cjs && electron-builder && node scripts/copy-build.cjs",
+    "mobile:build": "vite build && npx cap sync",
+    "mobile:android": "vite build && npx cap sync && npx cap open android",
+    "mobile:ios": "vite build && npx cap sync && npx cap open ios"
+  },
+  "build": {
+    "appId": "com.ahmed.taskmanager",
+    "productName": "Task & Event Manager",
+    "directories": {
+      "output": "C:/Users/MSI/Desktop/TaskAndEventManager-Installer"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "public/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Task & Event Manager",
+      "artifactName": "TaskAndEventManager-Setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "TaskAndEventManager-Portable.${ext}"
+    }
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
+    "@capacitor/keyboard": "^8.0.5",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3",
+    "@supabase/supabase-js": "^2.57.4",
+    "firebase": "^12.19.0",
+    "lucide-react": "^0.446.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.9.1",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.18",
+    "concurrently": "^10.0.5",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
+    "electron-packager": "^17.1.2",
+    "eslint": "^9.9.1",
+    "eslint-plugin-react-hooks": "^5.1.0-rc.0",
+    "eslint-plugin-react-refresh": "^0.4.11",
+    "globals": "^15.9.0",
+    "png-to-ico": "^3.0.2",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.5.3",
+    "typescript-eslint": "^8.3.0",
+    "vite": "^5.4.2",
+    "wait-on": "^9.1.0"
+  }
+}
