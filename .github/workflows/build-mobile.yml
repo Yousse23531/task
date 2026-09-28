@@ -8,7 +8,7 @@ on:
 jobs:
   build-android:
     name: Build Android APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -34,11 +34,13 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Install Android SDK 36
+      - name: Install Android SDK 35 & 36
         run: |
-          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-35" \
             "platforms;android-36" \
-            "build-tools;36.0.0"
+            "build-tools;35.0.0" \
+            "build-tools;36.0.0" 2>/dev/null || true
 
       - name: Make Gradlew Executable
         run: chmod +x android/gradlew
@@ -46,10 +48,11 @@ jobs:
       - name: Build Android Debug APK
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tail -50
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: Android-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
@@ -79,72 +82,75 @@ jobs:
       - name: Sync Capacitor (generates App.xcworkspace)
         run: npx cap sync ios
 
-      - name: Patch Capacitor plugin Package.swift for Swift 5 compatibility
+      - name: Patch plugin Package.swift to Swift 5.9
         run: |
-          # Downgrade swift-tools-version in all Capacitor plugin Package.swift files
           for pkg in \
             node_modules/@capacitor/keyboard/ios \
             node_modules/@capacitor/splash-screen/ios \
             node_modules/@capacitor/status-bar/ios; do
             if [ -f "$pkg/Package.swift" ]; then
-              echo "Patching $pkg/Package.swift"
-              # Replace swift-tools-version 6.x or 5.10+ with 5.9
-              sed -i '' 's/swift-tools-version: [0-9][0-9]*/swift-tools-version: 5.9/' "$pkg/Package.swift"
-              # Remove any swiftLanguageVersions that forces Swift 6
+              echo "=== Before patch: $pkg/Package.swift ==="
+              head -3 "$pkg/Package.swift"
+              sed -i '' 's/swift-tools-version:[[:space:]]*[0-9][0-9.]*/swift-tools-version: 5.9/' "$pkg/Package.swift"
+              # Remove swiftLanguageVersions line(s) that pin to Swift 6
               sed -i '' '/swiftLanguageVersions/d' "$pkg/Package.swift"
-              cat "$pkg/Package.swift" | head -5
+              echo "=== After patch ==="
+              head -3 "$pkg/Package.swift"
             fi
           done
 
-      - name: Show ios/App contents (debug)
-        run: ls -la ios/App/
+      - name: Detect workspace or project
+        id: detect
+        run: |
+          if [ -f "ios/App/App.xcworkspace/contents.xcworkspacedata" ]; then
+            echo "BUILD_ARG=-workspace App.xcworkspace" >> $GITHUB_OUTPUT
+            echo "Found xcworkspace"
+          else
+            echo "BUILD_ARG=-project App.xcodeproj" >> $GITHUB_OUTPUT
+            echo "Falling back to xcodeproj"
+          fi
+          ls -la ios/App/
 
-      - name: Resolve Swift Package Dependencies
+      - name: Resolve Swift Packages
         run: |
           cd ios/App
-          # Use whichever workspace exists after cap sync
-          if [ -f "App.xcworkspace/contents.xcworkspacedata" ]; then
-            echo "Found App.xcworkspace"
-            xcodebuild -resolvePackageDependencies \
-              -workspace App.xcworkspace \
-              -scheme App \
-              -clonedSourcePackagesDirPath SourcePackages
-          else
-            echo "App.xcworkspace not found, using xcodeproj"
-            xcodebuild -resolvePackageDependencies \
-              -project App.xcodeproj \
-              -scheme App \
-              -clonedSourcePackagesDirPath SourcePackages
-          fi
-
-      - name: Build iOS App (Archive)
-        run: |
-          cd ios/App
-          if [ -f "App.xcworkspace/contents.xcworkspacedata" ]; then
-            WORKSPACE_ARG="-workspace App.xcworkspace"
-          else
-            WORKSPACE_ARG="-project App.xcodeproj"
-          fi
-          xcodebuild \
-            $WORKSPACE_ARG \
+          xcodebuild ${{ steps.detect.outputs.BUILD_ARG }} \
             -scheme App \
-            -destination generic/platform=iOS \
+            -resolvePackageDependencies \
+            -clonedSourcePackagesDirPath SourcePackages 2>&1 | tail -20
+
+      - name: Build iOS App (no signing)
+        run: |
+          cd ios/App
+          xcodebuild \
+            ${{ steps.detect.outputs.BUILD_ARG }} \
+            -scheme App \
             -configuration Release \
+            -destination generic/platform=iOS \
             -archivePath build/App.xcarchive \
             archive \
+            SWIFT_VERSION=5 \
+            OTHER_SWIFT_FLAGS="-strict-concurrency=minimal -warn-concurrency" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             COMPILER_INDEX_STORE_ENABLE=NO \
-            SWIFT_VERSION=5 \
-            OTHER_SWIFT_FLAGS="-strict-concurrency=minimal"
+            2>&1 | grep -E "(error:|warning:|BUILD|FAILED|SUCCEEDED|SwiftCompile)" | tail -60
 
       - name: Package IPA
         run: |
-          cd ios/App/build
-          mkdir -p Payload
-          cp -r App.xcarchive/Products/Applications/App.app Payload/
-          zip -r TaskAndEventManager-iOS.ipa Payload/
+          cd ios/App
+          if [ -d "build/App.xcarchive/Products/Applications/App.app" ]; then
+            mkdir -p build/Payload
+            cp -r build/App.xcarchive/Products/Applications/App.app build/Payload/
+            cd build
+            zip -r TaskAndEventManager-iOS.ipa Payload/
+            echo "IPA created successfully"
+          else
+            echo "Archive contents:"
+            find build/App.xcarchive -name "*.app" 2>/dev/null || echo "No .app found"
+            exit 1
+          fi
 
       - name: Upload iOS IPA
         uses: actions/upload-artifact@v4
